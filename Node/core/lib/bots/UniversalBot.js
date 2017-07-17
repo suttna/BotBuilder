@@ -139,7 +139,7 @@ var UniversalBot = (function (_super) {
                 }
                 _this.emit('receive', message);
                 _this.eventMiddleware(message, _this.mwReceive, function () {
-                    if (_this.isMessage(message)) {
+                    if (_this.isMessage(message) || _this.isInvoke(message)) {
                         _this.emit('incoming', message);
                         var userId = message.user.id;
                         var conversationId = message.address.conversation ? message.address.conversation.id : null;
@@ -418,6 +418,9 @@ var UniversalBot = (function (_super) {
     };
     UniversalBot.prototype.isMessage = function (message) {
         return (message && message.type && message.type.toLowerCase() == consts.messageType);
+    };
+    UniversalBot.prototype.isInvoke = function (message) {
+        return (message && message.type && message.type.toLowerCase() == consts.invokeType);
     };
     UniversalBot.prototype.ensureConversation = function (address, done, error) {
         var _this = this;
