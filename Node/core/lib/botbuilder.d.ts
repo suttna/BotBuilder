@@ -1356,6 +1356,15 @@ export interface IConnector {
     send(messages: IMessage[], callback: (err: Error, addresses?: IAddress[]) => void): void;
 
     /**
+     * Send a message to the user and in a newly started reply chain address in channel
+     * @param messages Array of message(s) to send the user.
+     * @param callback Function to invoke once the operation is completed.
+     * @param callback.err Any error that occurred during the send.
+     * @param callback.addresses An array of address objects returned for each individual message within the batch. These address objects contain the ID of the posted messages so can be used to update or delete a message in the future.
+     */
+    startReplyChain?(messages: IMessage[], callback: (err: Error, addresses?: IAddress[]) => void): void;
+
+    /**
      * Called when a UniversalBot wants to start a new proactive conversation with a user. The
      * connector should return an address with a properly formated [IAddress.conversation](/en-us/node/builder/chat-reference/interfaces/_botbuilder_d_.iaddress#conversation)
      * field. This will typically be called when you call [UniversalBot.beginDialog()](/en-us/node/builder/chat-reference/classes/_botbuilder_d_.universalbot#begindialog)
@@ -4083,6 +4092,15 @@ export class UniversalBot extends Library  {
      * @param done.addresses An array of address objects returned for each individual message within the batch. These address objects contain the ID of the posted messages so can be used to update or delete a message in the future.
      */
     send(messages: IIsMessage|IMessage|IMessage[], done?: (err: Error, addresses?: IAddress[]) => void): void;
+
+    /**
+     * Send a message to the user and in a newly started reply chain address in channel
+     * @param messages The message (or array of messages) to send the user.
+     * @param done (Optional) function to invoke once the operation is completed.
+     * @param done.err Any error that occured during the send.
+     * @param done.addresses An array of address objects returned for each individual message within the batch. These address objects contain the ID of the posted messages so can be used to update or delete a message in the future.
+     */
+    startReplyChain(messages: IIsMessage|IMessage|IMessage[], done?: (err: Error, addresses?: IAddress[]) => void): void;
 
     /**
      * Returns information about when the last turn between the user and a bot occured. This can be called

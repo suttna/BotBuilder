@@ -46,7 +46,7 @@ import * as async from 'async';
 export interface IUniversalBotSettings {
     defaultDialogId?: string;
     defaultDialogArgs?: any;
-    localizerSettings?: IDefaultLocalizerSettings;    
+    localizerSettings?: IDefaultLocalizerSettings;
     lookupUser?: ILookupUser;
     processLimit?: number;
     autoBatchDelay?: number;
@@ -75,22 +75,22 @@ export interface IDisambiguateRouteHandler {
 }
 
 interface IConnectorMap {
-    [channel: string]: IConnector;    
+    [channel: string]: IConnector;
 }
 
 export class UniversalBot extends Library {
-    private settings = <IUniversalBotSettings>{ 
-        processLimit: 4, 
-        persistUserData: true, 
-        persistConversationData: true 
+    private settings = <IUniversalBotSettings>{
+        processLimit: 4,
+        persistUserData: true,
+        persistConversationData: true
     };
-    private connectors = <IConnectorMap>{}; 
+    private connectors = <IConnectorMap>{};
     private mwReceive = <IEventMiddleware[]>[];
     private mwSend = <IEventMiddleware[]>[];
-    private mwSession = <ISessionMiddleware[]>[]; 
+    private mwSession = <ISessionMiddleware[]>[];
     private localizer: DefaultLocalizer;
     private _onDisambiguateRoute: IDisambiguateRouteHandler;
-    
+
     constructor(connector: IConnector, settings?: IUniversalBotSettings);
     constructor(connector: IConnector, defaultDialog?: IDialogWaterfallStep|IDialogWaterfallStep[], libraryName?: string);
     constructor(connector?: IConnector, defaultDialog?: any, libraryName?: string) {
@@ -131,11 +131,11 @@ export class UniversalBot extends Library {
         // obj.localizer is automatically created based on settings
         return <UniversalBot>super.clone(obj);
     }
-    
+
     //-------------------------------------------------------------------------
     // Settings
     //-------------------------------------------------------------------------
-    
+
     public set(name: string, value: any): this {
         (<any>this.settings)[name] = value;
         if (value && name === 'localizerSettings') {
@@ -146,15 +146,15 @@ export class UniversalBot extends Library {
         }
         return this;
     }
-    
+
     public get(name: string): any {
         return (<any>this.settings)[name];
     }
-    
+
     //-------------------------------------------------------------------------
     // Connectors
     //-------------------------------------------------------------------------
-    
+
     public connector(channelId: string, connector?: IConnector): IConnector {
         var c: IConnector;
         if (connector) {
@@ -164,7 +164,7 @@ export class UniversalBot extends Library {
 
             // Optionally use connector for storage.
             var asStorage: IBotStorage = <any>connector;
-            if (!this.settings.storage && 
+            if (!this.settings.storage &&
                 typeof asStorage.getData === 'function' &&
                 typeof asStorage.saveData === 'function') {
                 this.settings.storage = asStorage;
@@ -180,7 +180,7 @@ export class UniversalBot extends Library {
     //-------------------------------------------------------------------------
     // Middleware
     //-------------------------------------------------------------------------
-    
+
     public use(...args: IMiddlewareMap[]): this {
         args.forEach((mw) => {
             var added = 0;
@@ -200,15 +200,15 @@ export class UniversalBot extends Library {
                 console.warn('UniversalBot.use: no compatible middleware hook found to install.')
             }
         });
-        return this;    
+        return this;
     }
-    
+
     //-------------------------------------------------------------------------
     // Messaging
     //-------------------------------------------------------------------------
-    
+
     public receive(events: IEvent|IEvent[], done?: (err: Error) => void): void {
-        var list: IEvent[] = Array.isArray(events) ? events : [events]; 
+        var list: IEvent[] = Array.isArray(events) ? events : [events];
         async.eachLimit(list, this.settings.processLimit, (message: IMessage, cb: (err: Error) => void) => {
             message.agent = consts.agent;
             message.type = message.type || consts.messageType;
@@ -222,12 +222,12 @@ export class UniversalBot extends Library {
                         this.emit('incoming', message);
                         var userId = message.user.id;
                         var conversationId = message.address.conversation ? message.address.conversation.id : null;
-                        var storageCtx: IBotStorageContext = { 
-                            userId: userId, 
-                            conversationId: conversationId, 
+                        var storageCtx: IBotStorageContext = {
+                            userId: userId,
+                            conversationId: conversationId,
                             address: message.address,
                             persistUserData: this.settings.persistUserData,
-                            persistConversationData: this.settings.persistConversationData 
+                            persistConversationData: this.settings.persistConversationData
                         };
                         this.dispatch(storageCtx, message, this.settings.defaultDialogId || '/', this.settings.defaultDialogArgs, cb);
                     } else {
@@ -239,7 +239,7 @@ export class UniversalBot extends Library {
             }, cb);
         }, this.errorLogger(done));
     }
- 
+
     public beginDialog(address: IAddress, dialogId: string, dialogArgs?: any, done?: (err: Error) => void): void {
         this.lookupUser(address, (user) => {
             var msg = <IMessage>{
@@ -254,27 +254,21 @@ export class UniversalBot extends Library {
             this.ensureConversation(msg.address, (adr) => {
                 msg.address = adr;
                 var conversationId = msg.address.conversation ? msg.address.conversation.id : null;
-                var storageCtx: IBotStorageContext = { 
-                    userId: msg.user.id, 
+                var storageCtx: IBotStorageContext = {
+                    userId: msg.user.id,
                     conversationId: conversationId,
                     address: msg.address,
                     persistUserData: this.settings.persistUserData,
-                    persistConversationData: this.settings.persistConversationData 
+                    persistConversationData: this.settings.persistConversationData
                 };
                 this.dispatch(storageCtx, msg, dialogId, dialogArgs, this.errorLogger(done), true);
             }, this.errorLogger(done));
         }, this.errorLogger(done));
     }
-    
+
     public send(messages: IIsMessage|IMessage|IMessage[], done?: (err: Error, addresses: IAddress[]) => void): void {
-        var list: IMessage[];
-        if (Array.isArray(messages)) {
-            list = messages;
-        } else if ((<IIsMessage>messages).toMessage) {
-            list = [(<IIsMessage>messages).toMessage()];
-        } else {
-            list = [<IMessage>messages];
-        }
+        const list = this.toMessageList(messages)
+
         async.eachLimit(list, this.settings.processLimit, (message, cb) => {
             this.ensureConversation(message.address, (adr) => {
                 message.address = adr;
@@ -301,15 +295,46 @@ export class UniversalBot extends Library {
         }));
     }
 
+    public startReplyChain(messages: IIsMessage|IMessage|IMessage[], done?: (err: Error, addresses: IAddress[]) => void): void {
+        const list = this.toMessageList(messages)
+
+        async.eachLimit(list, this.settings.processLimit, (message, cb) => {
+            this.emit('send', message);
+            this.eventMiddleware(message, this.mwSend, () => {
+                this.emit('outgoing', message);
+                cb(null);
+            }, cb);
+        }, this.errorLogger((err) => {
+            if (!err && list.length > 0) {
+                this.tryCatch(() => {
+                    // All messages should be targeted at the same channel.
+                    var channelId = list[0].address.channelId;
+                    var connector = this.connector(channelId);
+                    if (!connector) {
+                        throw new Error("Invalid channelId='" + channelId + "'");
+                    }
+
+                    if (!connector.startReplyChain) {
+                        throw new Error("Connector with channelId='" + channelId + "' does not support startReplyChain");
+                    }
+
+                    connector.startReplyChain(list, this.errorLogger(done));
+                }, this.errorLogger(done));
+            } else if (done) {
+                done(err, null);
+            }
+        }));
+    }
+
     public isInConversation(address: IAddress, cb: (err: Error, lastAccess: Date) => void): void {
         this.lookupUser(address, (user) => {
             var conversationId = address.conversation ? address.conversation.id : null;
-            var storageCtx: IBotStorageContext = { 
-                userId: user.id, 
-                conversationId: conversationId, 
+            var storageCtx: IBotStorageContext = {
+                userId: user.id,
+                conversationId: conversationId,
                 address: address,
                 persistUserData: false,
-                persistConversationData: false 
+                persistConversationData: false
             };
             this.getStorageData(storageCtx, (data) => {
                 var lastAccess: Date;
@@ -332,7 +357,7 @@ export class UniversalBot extends Library {
     //-------------------------------------------------------------------------
     // Session
     //-------------------------------------------------------------------------
-    
+
     /** Loads a session object for an arbitrary address. */
     public loadSession(address: IAddress, done: (err: Error, session: Session) => void): void {
         this.loadSessionWithOptionalDispatch(address, true, done);
@@ -340,6 +365,17 @@ export class UniversalBot extends Library {
 
     public loadSessionWithoutDispatching(address: IAddress, done: (err: Error, session: Session) => void): void {
         this.loadSessionWithOptionalDispatch(address, false, done);
+    }
+
+    /* Transform different representation of messages to IMessage */
+    private toMessageList(messages: IIsMessage|IMessage|IMessage[]): IMessage[] {
+      if (Array.isArray(messages)) {
+          return messages;
+      } else if ((<IIsMessage>messages).toMessage) {
+          return [(<IIsMessage>messages).toMessage()];
+      } else {
+          return [<IMessage>messages];
+      }
     }
 
     private loadSessionWithOptionalDispatch(address: IAddress, shouldDispatch: boolean, done: (err: Error, session: Session) => void): void {
@@ -358,12 +394,12 @@ export class UniversalBot extends Library {
             this.ensureConversation(msg.address, (adr) => {
                 msg.address = adr;
                 var conversationId = msg.address.conversation ? msg.address.conversation.id : null;
-                var storageCtx: IBotStorageContext = { 
-                    userId: msg.user.id, 
+                var storageCtx: IBotStorageContext = {
+                    userId: msg.user.id,
                     conversationId: conversationId,
                     address: msg.address,
                     persistUserData: this.settings.persistUserData,
-                    persistConversationData: this.settings.persistConversationData 
+                    persistConversationData: this.settings.persistConversationData
                 };
                 this.createSession(storageCtx, msg, this.settings.defaultDialogId || '/', this.settings.defaultDialogArgs, done, newStack, shouldDispatch);
             }, this.errorLogger(<any>done));
@@ -372,13 +408,13 @@ export class UniversalBot extends Library {
     //-------------------------------------------------------------------------
     // Helpers
     //-------------------------------------------------------------------------
-    
+
     private dispatch(storageCtx: IBotStorageContext, message: IMessage, dialogId: string, dialogArgs: any, done: (err: Error) => void, newStack = false): void {
         // --------------------------------------------------------------------
         // Theory of Operation
         // --------------------------------------------------------------------
-        // The dispatch() function is called for both reactive & pro-active 
-        // messages and while they generally work the same there are some 
+        // The dispatch() function is called for both reactive & pro-active
+        // messages and while they generally work the same there are some
         // differences worth noting.
         //
         // REACTIVE:
@@ -387,14 +423,14 @@ export class UniversalBot extends Library {
         //   load the persisted userData and conversationData objects.
         // * After loading data from storage we create a new Session object and
         //   dispatch the incoming message to the active dialog.
-        // * As part of the normal dialog flow the session will call onSave() 1 
-        //   or more times before each call to onSend().  Anytime onSave() is 
+        // * As part of the normal dialog flow the session will call onSave() 1
+        //   or more times before each call to onSend().  Anytime onSave() is
         //   called we'll save the current userData & conversationData objects
         //   to storage.
         //
         // PROACTIVE:
-        // * Proactive follows essentially the same flow but the difference is 
-        //   the passed in storageKey will only have a userId and not a 
+        // * Proactive follows essentially the same flow but the difference is
+        //   the passed in storageKey will only have a userId and not a
         //   conversationId as this is a new conversation.  This will cause use
         //   to load userData but conversationData will be set to {}.
         // * When onSave() is called for a proactive message we don't know the
@@ -403,7 +439,7 @@ export class UniversalBot extends Library {
         //   that's the point at which we can actually save state. So we'll update
         //   the storageKey with the new conversationId and then manually trigger
         //   saving the userData & conversationData to storage.
-        // * After the first call to onSend() for the conversation everything 
+        // * After the first call to onSend() for the conversation everything
         //   follows the same flow as for reactive messages.
         this.createSession(storageCtx, message, dialogId, dialogArgs, (err, session) => {
             // Dispatch message
@@ -461,7 +497,7 @@ export class UniversalBot extends Library {
                 }
             });
             session.on('error', (err: Error) => this.emitError(err));
-            
+
             // Initialize session data
             var sessionState: ISessionState;
             session.userData = data.userData || {};
@@ -472,7 +508,7 @@ export class UniversalBot extends Library {
                 delete session.privateConversationData[consts.Data.SessionState];
             }
             loadedData = data;  // We'll clone it when saving data later
-            
+
             if (shouldDispatch) {
                 session.dispatch(sessionState, message, () => done(null, session));
             } else {
@@ -493,17 +529,17 @@ export class UniversalBot extends Library {
         }
         entry += ' from "' + session.message.source + '"';
         session.logger.log(null, entry);
-        
+
         // Run the root libraries recognizers
         var context = session.toRecognizeContext();
         this.recognize(context, (err, topIntent) => {
             // Check for forwarded intent
             if (session.message.entities) {
                 session.message.entities.forEach((entity) => {
-                    if (entity.type === consts.intentEntityType && 
+                    if (entity.type === consts.intentEntityType &&
                         (<IIntentRecognizerResult>entity).score > topIntent.score) {
                         topIntent = entity;
-                    } 
+                    }
                 });
             }
 
@@ -514,7 +550,7 @@ export class UniversalBot extends Library {
             context.intent = topIntent;
             context.libraryName = this.name;
 
-            // Federate across all libraries to find the best route to trigger. 
+            // Federate across all libraries to find the best route to trigger.
             var results = Library.addRouteResult({ score: 0.0, libraryName: this.name });
             async.each(this.libraryList(), (lib, cb) => {
                 lib.findRoutes(context, (err, routes) => {
@@ -569,7 +605,7 @@ export class UniversalBot extends Library {
     private isMessage(message: IMessage): boolean {
         return (message && message.type && message.type.toLowerCase() == consts.messageType);
     }
-    
+
     private ensureConversation(address: IAddress, done: (adr: IAddress) => void, error?: (err: Error) => void): void {
         this.tryCatch(() => {
             if (!address.conversation) {
@@ -589,7 +625,7 @@ export class UniversalBot extends Library {
             }
         }, error);
     }
-    
+
     private lookupUser(address: IAddress, done: (user: IIdentity) => void, error?: (err: Error) => void): void {
         this.tryCatch(() => {
             this.emit('lookupUser', address);
@@ -606,7 +642,7 @@ export class UniversalBot extends Library {
             }
         }, error);
     }
-    
+
     private getStorageData(storageCtx: IBotStorageContext, done: (data: IBotStorageData) => void, error?: (err: Error) => void): void {
         this.tryCatch(() => {
             this.emit('getStorageData', storageCtx);
@@ -616,11 +652,11 @@ export class UniversalBot extends Library {
                     this.tryCatch(() => done(data || {}), error);
                 } else if (error) {
                     error(err);
-                } 
-            });  
+                }
+            });
         }, error);
     }
-    
+
     private saveStorageData(storageCtx: IBotStorageContext, data: IBotStorageData, done?: Function, error?: (err: Error) => void): void {
         this.tryCatch(() => {
             this.emit('saveStorageData', storageCtx);
@@ -632,8 +668,8 @@ export class UniversalBot extends Library {
                     }
                 } else if (error) {
                     error(err);
-                } 
-            });  
+                }
+            });
         }, error);
     }
 
@@ -643,7 +679,7 @@ export class UniversalBot extends Library {
         }
         return this.settings.storage;
     }
-    
+
     private tryCatch(fn: Function, error?: (err?: Error, results?: any) => void): void {
         try {
             fn();
@@ -669,7 +705,7 @@ export class UniversalBot extends Library {
             }
         };
     }
-     
+
     private emitError(err: Error): void {
         var m = err.toString();
         var e = err instanceof Error ? err : new Error(m);

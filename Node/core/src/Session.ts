@@ -1,15 +1,15 @@
-﻿// 
+﻿//
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license.
-// 
+//
 // Microsoft Bot Framework: http://botframework.com
-// 
+//
 // Bot Builder SDK Github:
 // https://github.com/Microsoft/BotBuilder
-// 
+//
 // Copyright (c) Microsoft Corporation
 // All rights reserved.
-// 
+//
 // MIT License:
 // Permission is hereby granted, free of charge, to any person obtaining
 // a copy of this software and associated documentation files (the
@@ -18,10 +18,10 @@
 // distribute, sublicense, and/or sell copies of the Software, and to
 // permit persons to whom the Software is furnished to do so, subject to
 // the following conditions:
-// 
+//
 // The above copyright notice and this permission notice shall be
 // included in all copies or substantial portions of the Software.
-// 
+//
 // THE SOFTWARE IS PROVIDED ""AS IS"", WITHOUT WARRANTY OF ANY KIND,
 // EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -49,6 +49,7 @@ export interface IConnector {
     onInvoke?(handler: (event: IEvent, cb?: (err: Error, body: any, status?: number) => void) => void): void;
     send(messages: IMessage[], cb: (err: Error, addresses?: IAddress[]) => void): void;
     startConversation(address: IAddress, cb: (err: Error, address?: IAddress) => void): void;
+    startReplyChain?(messages: IMessage[], cb: (err: Error, addresses?: IAddress[]) => void): void;
     update?(message: IMessage, done: (err: Error, address?: IAddress) => void): void;
     delete?(address: IAddress, done: (err: Error) => void): void;
 }
@@ -110,8 +111,8 @@ export class Session extends events.EventEmitter {
             logger: this.logger,
             dialogStack: () => { return this.dialogStack(); },
             preferredLocale: () => { return this.preferredLocale(); },
-            gettext: (...args: any[]) => { return Session.prototype.gettext.call(this, args); }, 
-            ngettext: (...args: any[]) => { return Session.prototype.ngettext.call(this, args); }, 
+            gettext: (...args: any[]) => { return Session.prototype.gettext.call(this, args); },
+            ngettext: (...args: any[]) => { return Session.prototype.ngettext.call(this, args); },
             locale: this.preferredLocale()
         };
     }
@@ -206,7 +207,7 @@ export class Session extends events.EventEmitter {
             } else if (this.localizer) {
                 this._locale = this.localizer.defaultLocale();
             }
-        }        
+        }
         return this._locale;
     }
 
@@ -227,10 +228,10 @@ export class Session extends events.EventEmitter {
         }
         return sprintf.sprintf(tmpl, count);
     }
-    
+
     /** Used to manually save the current session state. */
     public save(): this {
-        this.logger.log(this.dialogStack(), 'Session.save()');            
+        this.logger.log(this.dialogStack(), 'Session.save()');
         this.startBatch();
         return this;
     }
@@ -255,7 +256,7 @@ export class Session extends events.EventEmitter {
             }
             this.prepareMessage(m);
             this.batch.push(m);
-            this.logger.log(this.dialogStack(), 'Session.send()');            
+            this.logger.log(this.dialogStack(), 'Session.send()');
         }
         this.startBatch();
         return this;
@@ -292,8 +293,8 @@ export class Session extends events.EventEmitter {
         var m = <IMessage>{ type: 'typing' };
         this.prepareMessage(m);
         this.batch.push(m);
-        this.logger.log(this.dialogStack(), 'Session.sendTyping()');            
-        return this;        
+        this.logger.log(this.dialogStack(), 'Session.sendTyping()');
+        return this;
     }
 
     /** Inserts a delay between outgoing messages. */
@@ -303,7 +304,7 @@ export class Session extends events.EventEmitter {
         this.prepareMessage(m);
         this.batch.push(m);
         this.logger.log(this.dialogStack(), 'Session.delay(%d)', delay);
-        return this;        
+        return this;
     }
 
     /** Returns true if at least one message has been sent. */
@@ -314,13 +315,13 @@ export class Session extends events.EventEmitter {
     /** Begins a new dialog. */
     public beginDialog(id: string, args?: any): this {
         // Find dialog
-        this.logger.log(this.dialogStack(), 'Session.beginDialog(' + id + ')');            
+        this.logger.log(this.dialogStack(), 'Session.beginDialog(' + id + ')');
         var id = this.resolveDialogId(id);
         var dialog = this.findDialog(id);
         if (!dialog) {
             throw new Error('Dialog[' + id + '] not found.');
         }
-        
+
         // Push dialog onto stack and start it
         // - Removed the call to save() here as an optimization. In the case of prompts
         //   we end up saving state twice, once here and again after they save off all of
@@ -337,13 +338,13 @@ export class Session extends events.EventEmitter {
     /** Replaces the existing dialog with a new one.  */
     public replaceDialog(id: string, args?: any): this {
         // Find dialog
-        this.logger.log(this.dialogStack(), 'Session.replaceDialog(' + id + ')');            
+        this.logger.log(this.dialogStack(), 'Session.replaceDialog(' + id + ')');
         var id = this.resolveDialogId(id);
         var dialog = this.findDialog(id);
         if (!dialog) {
             throw new Error('Dialog[' + id + '] not found.');
         }
-        
+
         // Update the stack and start dialog
         this.popDialog();
         this.pushDialog({ id: id, state: {} });
@@ -380,7 +381,7 @@ export class Session extends events.EventEmitter {
         this.batch.push(mec);
 
         // Clear stack and save.
-        this.logger.log(this.dialogStack(), 'Session.endConversation()');            
+        this.logger.log(this.dialogStack(), 'Session.endConversation()');
         var ss = this.sessionState;
         ss.callstack = [];
         this.sendBatch();
@@ -391,7 +392,7 @@ export class Session extends events.EventEmitter {
     public endDialog(message?: string|string[]|IMessage|IIsMessage, ...args: any[]): this {
         // Check for result being passed
         if (typeof message === 'object' && (message.hasOwnProperty('response') || message.hasOwnProperty('resumed') || message.hasOwnProperty('error'))) {
-            console.warn('Returning results via Session.endDialog() is deprecated. Use Session.endDialogWithResult() instead.')            
+            console.warn('Returning results via Session.endDialog() is deprecated. Use Session.endDialogWithResult() instead.')
             return this.endDialogWithResult(<any>message);
         }
 
@@ -412,9 +413,9 @@ export class Session extends events.EventEmitter {
                 this.prepareMessage(m);
                 this.batch.push(m);
             }
-                    
+
             // Pop dialog off the stack and then resume parent.
-            this.logger.log(this.dialogStack(), 'Session.endDialog()');            
+            this.logger.log(this.dialogStack(), 'Session.endDialog()');
             var childId = cur.id;
             cur = this.popDialog();
             this.startBatch();
@@ -443,9 +444,9 @@ export class Session extends events.EventEmitter {
                 result.resumed = ResumeReason.completed;
             }
             result.childId = cur.id;
-                    
+
             // Pop dialog off the stack and resume parent dlg.
-            this.logger.log(this.dialogStack(), 'Session.endDialogWithResult()');            
+            this.logger.log(this.dialogStack(), 'Session.endDialogWithResult()');
             cur = this.popDialog();
             this.startBatch();
             if (cur) {
@@ -468,14 +469,14 @@ export class Session extends events.EventEmitter {
         var childId = typeof dialogId === 'number' ? this.sessionState.callstack[<number>dialogId].id : <string>dialogId;
         var cur = this.deleteDialogs(dialogId);
         if (replaceWithId) {
-            this.logger.log(this.dialogStack(), 'Session.cancelDialog(' + replaceWithId + ')');            
+            this.logger.log(this.dialogStack(), 'Session.cancelDialog(' + replaceWithId + ')');
             var id = this.resolveDialogId(replaceWithId);
             var dialog = this.findDialog(id);
             this.pushDialog({ id: id, state: {} });
             this.startBatch();
             dialog.begin(this, replaceWithArgs);
         } else {
-            this.logger.log(this.dialogStack(), 'Session.cancelDialog()');            
+            this.logger.log(this.dialogStack(), 'Session.cancelDialog()');
             this.startBatch();
             if (cur) {
                 var dialog = this.findDialog(cur.id);
@@ -493,7 +494,7 @@ export class Session extends events.EventEmitter {
 
     /** Resets the dialog stack and starts a new dialog. */
     public reset(dialogId?: string, dialogArgs?: any): this {
-        this.logger.log(this.dialogStack(), 'Session.reset()');            
+        this.logger.log(this.dialogStack(), 'Session.reset()');
         this._isReset = true;
         this.sessionState.callstack = [];
         if (!dialogId) {
@@ -511,7 +512,7 @@ export class Session extends events.EventEmitter {
 
     /** Manually triggers sending of the current auto-batch. */
     public sendBatch(done?: (err: Error, responses?: any[]) => void): void {
-        this.logger.log(this.dialogStack(), 'Session.sendBatch() sending ' + this.batch.length + ' message(s)');            
+        this.logger.log(this.dialogStack(), 'Session.sendBatch() sending ' + this.batch.length + ' message(s)');
         if (this.sendingBatch) {
             this.batchStarted = true;
             return;
@@ -579,7 +580,7 @@ export class Session extends events.EventEmitter {
         this.dialogData = null;
         return this;
     }
-    
+
     /** Enumerates all a stacks dialog entries in either a forward or reverse direction. */
     static forEachDialogStackEntry(stack: IDialogState[], reverse: boolean, fn: (entry: IDialogState, index: number) => void): void {
         var step = reverse ? -1 : 1;
@@ -599,7 +600,7 @@ export class Session extends events.EventEmitter {
             }
         }
         return -1;
-    } 
+    }
 
     /** Returns a stacks active dialog or null. */
     static activeDialogStackEntry(stack: IDialogState[]): IDialogState {
@@ -685,7 +686,7 @@ export class Session extends events.EventEmitter {
 
     /** Returns the list of enabled watch statements for the session. */
     public watchList(): string[] {
-        var watches: string[] = []; 
+        var watches: string[] = [];
         if (this.userData.hasOwnProperty(consts.Data.DebugWatches)) {
             for (let name in this.userData[consts.Data.DebugWatches]) {
                 if (this.userData[consts.Data.DebugWatches][name]) {
@@ -731,12 +732,12 @@ export class Session extends events.EventEmitter {
                 switch ((<any>err).code || '') {
                     case consts.Errors.EBADMSG:
                     case consts.Errors.EMSGSIZE:
-                        // Something wrong with state so reset everything 
+                        // Something wrong with state so reset everything
                         this.userData = {};
                         this.batch = [];
                         this.endConversation(this.options.dialogErrorMessage || 'Oops. Something went wrong and we need to start over.');
                         break;
-                } 
+                }
             }
             cb(err);
         });
@@ -765,7 +766,7 @@ export class Session extends events.EventEmitter {
                     entry.handler(ctx, (err, value) => {
                         if (!err) {
                             this.logger.dump(variable, value);
-                        } 
+                        }
                         cb(err);
                     });
                 } catch (e) {
@@ -806,7 +807,7 @@ export class Session extends events.EventEmitter {
             .text(this.vgettext(localizationNamespace, Message.randomPrompt(text), args));
         return message.toMessage();
     }
-    
+
     private prepareMessage(msg: IMessage): void {
         if (!msg.type) {
             msg.type = 'message';
@@ -819,7 +820,7 @@ export class Session extends events.EventEmitter {
         }
     }
 
- 
+
     private vgettext(localizationNamespace: string, messageid: string, args?: any[]): string {
         var tmpl: string;
         if (this.localizer && this.message) {
@@ -911,7 +912,7 @@ export class Session extends events.EventEmitter {
     //-----------------------------------------------------
     // DEPRECATED METHODS
     //-----------------------------------------------------
-    
+
     public getMessageReceived(): any {
         console.warn("Session.getMessageReceived() is deprecated. Use Session.message.sourceEvent instead.");
         return this.message.sourceEvent;
@@ -928,4 +929,3 @@ let watchableHandlers: { [name: string]: { name: string; handler: IWatchableHand
     'preferredlocale': { name: 'preferredLocale', handler: (ctx, cb) => cb(null, ctx.preferredLocale()) },
     'libraryname': { name: 'libraryName', handler: (ctx, cb) => cb(null, ctx.libraryName) }
 };
-
