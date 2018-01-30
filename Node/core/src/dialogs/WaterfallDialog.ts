@@ -40,6 +40,7 @@ export interface IDialogWaterfallStep {
     (session: Session, result?: any, skip?: (results?: IDialogResult<any>) => void): void;
 }
 
+export type BeforeWaterfallBeginHandler = (session: Session, args: any, next: (args: any) => void) => void;
 export type BeforeWaterfallStepHandler = (session: Session, step: number, args: any, next: (step: number, args: any) => void) => void;
 
 interface IWaterfallRecognizerResult extends IRecognizeResult {
@@ -48,6 +49,7 @@ interface IWaterfallRecognizerResult extends IRecognizeResult {
 
 export class WaterfallDialog extends Dialog {
     private steps: IDialogWaterfallStep[];
+    private _onBeforeBegin: BeforeWaterfallBeginHandler;
     private _onBeforeStep: BeforeWaterfallStepHandler[] = [];
 
     constructor(steps: IDialogWaterfallStep|IDialogWaterfallStep[]) {
@@ -60,11 +62,17 @@ export class WaterfallDialog extends Dialog {
     }
 
     public begin<T>(session: Session, args?: T): void {
-        this.doStep(session, 0, args);
+        if (this._onBeforeBegin) {
+          this._onBeforeBegin(session, args, (args) => {
+            this.doStep(session, 0, args);
+          })
+        } else {
+          this.doStep(session, 0, args);
+        }
     }
- 
+
     public replyReceived(session: Session, recognizeResult: IWaterfallRecognizerResult): void {
-        this.doStep(session, 0, recognizeResult.args);        
+        this.doStep(session, 0, recognizeResult.args);
     }
 
     public dialogResumed(session: Session, result: IDialogResult<any>): void {
@@ -84,6 +92,11 @@ export class WaterfallDialog extends Dialog {
         this.doStep(session, step, result);
     }
 
+    public onBeforeBegin(handler: BeforeWaterfallBeginHandler): this {
+        this._onBeforeBegin = handler;
+        return this;
+    }
+
     public onBeforeStep(handler: BeforeWaterfallStepHandler): this {
         this._onBeforeStep.unshift(handler);
         return this;
@@ -99,7 +112,7 @@ export class WaterfallDialog extends Dialog {
             this.dialogResumed(session, result);
         };
 
-        // Call any onBeforeStep() handlers                
+        // Call any onBeforeStep() handlers
         this.beforeStep(session, step, args, (s, a) => {
             if (s >= 0) {
                 if (s < this.steps.length) {
@@ -194,6 +207,6 @@ export class WaterfallDialog extends Dialog {
                 s.logger.warn(s.dialogStack(), 'waterfall() empty waterfall detected');
                 s.endDialogWithResult({ resumed: ResumeReason.notCompleted });
             }
-        }; 
+        };
     }
 }

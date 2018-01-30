@@ -26,7 +26,15 @@ var WaterfallDialog = (function (_super) {
         return _this;
     }
     WaterfallDialog.prototype.begin = function (session, args) {
-        this.doStep(session, 0, args);
+        var _this = this;
+        if (this._onBeforeBegin) {
+            this._onBeforeBegin(session, args, function (args) {
+                _this.doStep(session, 0, args);
+            });
+        }
+        else {
+            this.doStep(session, 0, args);
+        }
     };
     WaterfallDialog.prototype.replyReceived = function (session, recognizeResult) {
         this.doStep(session, 0, recognizeResult.args);
@@ -44,6 +52,10 @@ var WaterfallDialog = (function (_super) {
                 break;
         }
         this.doStep(session, step, result);
+    };
+    WaterfallDialog.prototype.onBeforeBegin = function (handler) {
+        this._onBeforeBegin = handler;
+        return this;
     };
     WaterfallDialog.prototype.onBeforeStep = function (handler) {
         this._onBeforeStep.unshift(handler);

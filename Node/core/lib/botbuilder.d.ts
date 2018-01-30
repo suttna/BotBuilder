@@ -3930,6 +3930,14 @@ export class WaterfallDialog extends Dialog {
     replyReceived(session: Session): void;
 
     /**
+     * Registers a handler that will be called before the first waterfall step. This handler lets a
+     * developer skip the entire dialog and process the args being passed to the first step of it.
+     *
+     * @param handler Function to invoke before the first waterfall step.
+     */
+    onBeforeBegin(handler: (session: Session, args: any, next: (args: any) => void) => void): WaterfallDialog;
+
+    /**
      * Registers a handler that will be called before every step of the waterfall. The handlers
      * `next()` function will execute either the next handler in the chain or the waterfall step
      * itself.  This handler lets a developer skip steps and process the args being passed to
